@@ -1,0 +1,1 @@
+{\n  "name": "@etunda/shared",\n  "version": "1.0.0",\n  "description": "eTunda Shared Types and Utilities",\n  "main": "dist/index.js",\n  "types": "dist/index.d.ts"\n}
