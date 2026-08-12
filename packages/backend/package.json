@@ -1,1 +1,46 @@
-{\n  "name": "@etunda/backend",\n  "version": "1.0.0",\n  "description": "eTunda Backend API Server",\n  "main": "dist/index.js",\n  "scripts": {\n    "dev": "nodemon --exec ts-node src/index.ts",\n    "build": "tsc",\n    "start": "node dist/index.js",\n    "test": "jest",\n    "test:watch": "jest --watch",\n    "lint": "eslint src --ext .ts",\n    "format": "prettier --write \"src/**/*.{ts,json}\""\n  },\n  "dependencies": {\n    "express": "^4.18.2",\n    "pg": "^8.11.1",\n    "dotenv": "^16.3.1",\n    "cors": "^2.8.5",\n    "helmet": "^7.0.0",\n    "joi": "^17.10.0",\n    "jsonwebtoken": "^9.0.2",\n    "bcryptjs": "^2.4.3"\n  },\n  "devDependencies": {\n    "@types/express": "^4.17.20",\n    "@types/node": "^20.8.0",\n    "typescript": "^5.2.2",\n    "ts-node": "^10.9.1",\n    "nodemon": "^3.0.1",\n    "jest": "^29.7.0",\n    "ts-jest": "^29.1.1"\n  }\n}
+{
+  "name": "@etunda/backend",
+  "version": "1.0.0",
+  "description": "eTunda Backend API Server",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=unit",
+    "test:integration": "jest --testPathPattern=integration",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.{ts,json}\""
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.1",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "joi": "^17.10.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "stripe": "^12.15.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.20",
+    "@types/node": "^20.8.0",
+    "@types/jest": "^29.5.5",
+    "@types/pg": "^8.11.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.5",
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.1",
+    "ts-jest": "^29.1.1",
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "eslint": "^8.50.0",
+    "prettier": "^3.0.0",
+    "supertest": "^6.3.3",
+    "@types/supertest": "^6.0.0"
+  }
+}

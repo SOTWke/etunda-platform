@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: etunda_postgres_test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: etunda_test_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Feature: Authentication Service (isolated)
+  auth-service:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: etunda_auth_service
+    ports:
+      - "5001:5000"
+    environment:
+      NODE_ENV: test
+      DB_HOST: postgres-test
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: etunda_test_db
+      JWT_SECRET: test-secret-key
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    command: npm run test:unit
+
+  # Feature: Products Service (isolated)
+  products-service:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: etunda_products_service
+    ports:
+      - "5002:5000"
+    environment:
+      NODE_ENV: test
+      DB_HOST: postgres-test
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: etunda_test_db
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    command: npm run test:unit
+
+  # Feature: Orders Service (isolated)
+  orders-service:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: etunda_orders_service
+    ports:
+      - "5003:5000"
+    environment:
+      NODE_ENV: test
+      DB_HOST: postgres-test
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: etunda_test_db
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    command: npm run test:unit
+
+volumes:
+  postgres_test_data:
