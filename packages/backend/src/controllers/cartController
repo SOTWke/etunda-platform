@@ -1,0 +1,108 @@
+import { Request, Response } from 'express';
+import * as cartService from '../services/cartService';
+import * as buyerService from '../services/buyerService';
+
+async function resolveBuyerId(req: Request, res: Response): Promise<string | null> {
+  const userId = (req as any).user?.id;
+  if (!userId) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return null;
+  }
+
+  try {
+    const buyer = await buyerService.getBuyerByUserId(userId);
+    return buyer.id;
+  } catch {
+    res.status(403).json({ error: 'Buyer profile required. Please create a buyer profile first.' });
+    return null;
+  }
+}
+
+export const getCart = async (req: Request, res: Response) => {
+  try {
+    const buyerId = await resolveBuyerId(req, res);
+    if (!buyerId) return;
+
+    const items = await cartService.getCartByBuyer(buyerId);
+    const subtotal = await cartService.getCartSubtotal(buyerId);
+    res.json({ data: { items, subtotal } });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const addToCart = async (req: Request, res: Response) => {
+  try {
+    const buyerId = await resolveBuyerId(req, res);
+    if (!buyerId) return;
+
+    const { productId, quantity } = req.body;
+
+    if (!productId || quantity === undefined) {
+      return res.status(400).json({ error: 'productId and quantity are required' });
+    }
+
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'quantity must be a positive integer' });
+    }
+
+    const item = await cartService.addToCart(buyerId, productId, quantity);
+    res.status(201).json({ data: item });
+  } catch (error: any) {
+    const status = error.message.includes('not found')
+      ? 404
+      : error.message.includes('stock') || error.message.includes('minimum')
+        ? 400
+        : 400;
+    res.status(status).json({ error: error.message });
+  }
+};
+
+export const updateCartItem = async (req: Request, res: Response) => {
+  try {
+    const buyerId = await resolveBuyerId(req, res);
+    if (!buyerId) return;
+
+    const { productId } = req.params;
+    const { quantity } = req.body;
+
+    if (quantity === undefined) {
+      return res.status(400).json({ error: 'quantity is required' });
+    }
+
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'quantity must be a positive integer' });
+    }
+
+    const item = await cartService.updateCartItem(buyerId, productId, quantity);
+    res.json({ data: item });
+  } catch (error: any) {
+    const status = error.message.includes('not found') ? 404 : 400;
+    res.status(status).json({ error: error.message });
+  }
+};
+
+export const removeFromCart = async (req: Request, res: Response) => {
+  try {
+    const buyerId = await resolveBuyerId(req, res);
+    if (!buyerId) return;
+
+    const { productId } = req.params;
+    await cartService.removeFromCart(buyerId, productId);
+    res.json({ message: 'Item removed from cart' });
+  } catch (error: any) {
+    res.status(error.message.includes('not found') ? 404 : 400).json({ error: error.message });
+  }
+};
+
+export const clearCart = async (req: Request, res: Response) => {
+  try {
+    const buyerId = await resolveBuyerId(req, res);
+    if (!buyerId) return;
+
+    await cartService.clearCart(buyerId);
+    res.json({ message: 'Cart cleared' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
