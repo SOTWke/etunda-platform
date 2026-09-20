@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import * as authController from '../controllers/authController';
-import { authMiddleware } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { registerSchema, loginSchema } from '../middleware/schemas';
 
 const router = Router();
 
-router.post('/register', authController.register);
-router.post('/login', authController.login);
-router.get('/profile', authMiddleware, authController.getProfile);
+router.post('/register', validate(registerSchema), authController.register);
+router.post('/login', validate(loginSchema), authController.login);
 
 export default router;
