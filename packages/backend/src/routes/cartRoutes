@@ -1,12 +1,19 @@
 import { Router } from 'express';
 import * as cartController from '../controllers/cartController';
 import { authMiddleware } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { addToCartSchema, updateCartItemSchema } from '../middleware/schemas';
 
 const router = Router();
 
 router.get('/', authMiddleware, cartController.getCart);
-router.post('/', authMiddleware, cartController.addToCart);
-router.put('/:productId', authMiddleware, cartController.updateCartItem);
+router.post('/', authMiddleware, validate(addToCartSchema), cartController.addToCart);
+router.put(
+  '/:productId',
+  authMiddleware,
+  validate(updateCartItemSchema),
+  cartController.updateCartItem
+);
 router.delete('/:productId', authMiddleware, cartController.removeFromCart);
 router.delete('/', authMiddleware, cartController.clearCart);
 
