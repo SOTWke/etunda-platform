@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import apiClient from '../services/api';
+import Layout from '../components/Layout';
+import { useAuthStore } from '../stores/authStore';
 
 interface Product {
   id: string;
@@ -8,6 +11,7 @@ interface Product {
   price: number;
   quantity: number;
   category: string;
+  unit?: string;
 }
 
 export const ProductsPage: React.FC = () => {
@@ -15,6 +19,8 @@ export const ProductsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [offset, setOffset] = useState(0);
+  const [message, setMessage] = useState('');
+  const { user, token } = useAuthStore();
 
   useEffect(() => {
     fetchProducts();
@@ -24,7 +30,7 @@ export const ProductsPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await apiClient.getProducts(20, offset);
-      setProducts(response.data);
+      setProducts(response.data || []);
     } catch (error) {
       console.error('Failed to fetch products:', error);
     } finally {
@@ -42,7 +48,7 @@ export const ProductsPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await apiClient.searchProducts(searchTerm);
-      setProducts(response.data);
+      setProducts(response.data || []);
     } catch (error) {
       console.error('Search failed:', error);
     } finally {
@@ -50,63 +56,102 @@ export const ProductsPage: React.FC = () => {
     }
   };
 
+  const addToCart = async (productId: string) => {
+    setMessage('');
+    try {
+      await apiClient.addToCart(productId, 1);
+      setMessage('Added to cart');
+    } catch (e: any) {
+      setMessage(e.response?.data?.error || 'Could not add to cart');
+    }
+  };
+
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>🌾 Products Marketplace</h1>
+    <Layout>
+      <div style={styles.container}>
+        <h1 style={styles.title}>🌾 Products Marketplace</h1>
 
-      <form onSubmit={handleSearch} style={styles.searchForm}>
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={styles.searchInput}
-        />
-        <button type="submit" style={styles.searchButton}>
-          Search
-        </button>
-      </form>
+        <form onSubmit={handleSearch} style={styles.searchForm}>
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={styles.searchInput}
+          />
+          <button type="submit" style={styles.searchButton}>
+            Search
+          </button>
+        </form>
 
-      {loading ? (
-        <div style={styles.loading}>Loading...</div>
-      ) : (
-        <>
-          <div style={styles.productGrid}>
-            {products.map((product) => (
-              <div key={product.id} style={styles.productCard}>
-                <h3 style={styles.productName}>{product.name}</h3>
-                <p style={styles.productDescription}>{product.description}</p>
-                <div style={styles.productDetails}>
-                  <span style={styles.price}>KES {product.price}</span>
-                  <span style={styles.category}>{product.category}</span>
+        {message && (
+          <p style={{ color: message.includes('Added') ? 'green' : 'crimson' }}>{message}</p>
+        )}
+
+        {loading ? (
+          <div style={styles.loading}>Loading...</div>
+        ) : (
+          <>
+            <div style={styles.productGrid}>
+              {products.map((product) => (
+                <div key={product.id} style={styles.productCard}>
+                  <Link
+                    to={`/products/${product.id}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <h3 style={styles.productName}>{product.name}</h3>
+                    <p style={styles.productDescription}>{product.description}</p>
+                  </Link>
+                  <div style={styles.productDetails}>
+                    <span style={styles.price}>
+                      KES {product.price}
+                      {product.unit ? ` / ${product.unit}` : ''}
+                    </span>
+                    <span style={styles.category}>{product.category}</span>
+                  </div>
+                  <p style={styles.quantity}>Available: {product.quantity}</p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Link to={`/products/${product.id}`} style={styles.viewLink}>
+                      View
+                    </Link>
+                    {token && user?.role === 'buyer' && (
+                      <button
+                        type="button"
+                        style={styles.buyButton}
+                        onClick={() => addToCart(product.id)}
+                      >
+                        Add to Cart
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <p style={styles.quantity}>
-                  Available: {product.quantity} units
-                </p>
-                <button style={styles.buyButton}>Add to Cart</button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div style={styles.pagination}>
-            <button
-              onClick={() => setOffset(Math.max(0, offset - 20))}
-              disabled={offset === 0}
-              style={styles.paginationButton}
-            >
-              Previous
-            </button>
-            <span>Page {offset / 20 + 1}</span>
-            <button
-              onClick={() => setOffset(offset + 20)}
-              style={styles.paginationButton}
-            >
-              Next
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+            {products.length === 0 && <p>No products found.</p>}
+
+            <div style={styles.pagination}>
+              <button
+                type="button"
+                onClick={() => setOffset(Math.max(0, offset - 20))}
+                disabled={offset === 0}
+                style={styles.paginationButton}
+              >
+                Previous
+              </button>
+              <span>Page {offset / 20 + 1}</span>
+              <button
+                type="button"
+                onClick={() => setOffset(offset + 20)}
+                style={styles.paginationButton}
+              >
+                Next
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Layout>
   );
 };
 
@@ -114,7 +159,6 @@ const styles = {
   container: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '20px',
   } as React.CSSProperties,
   title: {
     fontSize: '28px',
@@ -203,6 +247,17 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontWeight: 'bold',
+    flex: 1,
+  } as React.CSSProperties,
+  viewLink: {
+    padding: '10px',
+    backgroundColor: '#e5e7eb',
+    color: '#333',
+    borderRadius: '4px',
+    textDecoration: 'none',
+    textAlign: 'center' as const,
+    fontWeight: 'bold',
+    flex: 1,
   } as React.CSSProperties,
   pagination: {
     display: 'flex',
