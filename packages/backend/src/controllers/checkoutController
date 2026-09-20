@@ -1,0 +1,43 @@
+import { Request, Response } from 'express';
+import * as checkoutService from '../services/checkoutService';
+import * as buyerService from '../services/buyerService';
+
+export const checkout = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    let buyer;
+    try {
+      buyer = await buyerService.getBuyerByUserId(userId);
+    } catch {
+      return res.status(403).json({
+        error: 'Buyer profile required. Please create a buyer profile first.',
+      });
+    }
+
+    const result = await checkoutService.checkout(buyer.id);
+
+    res.status(201).json({
+      data: {
+        order: result.order,
+        items: result.items,
+        total: result.total,
+        message: 'Order created successfully',
+      },
+    });
+  } catch (error: any) {
+    const msg = error.message || 'Checkout failed';
+    const status =
+      msg.includes('empty') ||
+      msg.includes('stock') ||
+      msg.includes('MOQ') ||
+      msg.includes('not found')
+        ? 400
+        : 500;
+    res.status(status).json({ error: msg });
+  }
+};
