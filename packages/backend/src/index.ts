@@ -10,6 +10,7 @@ import farmerRoutes from './routes/farmerRoutes';
 import buyerRoutes from './routes/buyerRoutes';
 import orderRoutes from './routes/orderRoutes';
 import paymentRoutes from './routes/paymentRoutes';
+import cartRoutes from './routes/cartRoutes';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/api/farmers', farmerRoutes);
 app.use('/api/buyers', buyerRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/cart', cartRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -73,6 +75,7 @@ const startServer = async () => {
       console.log(`🚀 eTunda Backend running on port ${PORT}`);
       console.log(`📍 Health: http://localhost:${PORT}/health`);
       console.log(`💳 Payments: http://localhost:${PORT}/api/payments`);
+      console.log(`🛒 Cart: http://localhost:${PORT}/api/cart`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
