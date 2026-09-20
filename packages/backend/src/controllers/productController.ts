@@ -32,20 +32,51 @@ export const createProduct = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get farmer profile by user ID
     let farmer;
     try {
       farmer = await farmerService.getFarmerByUserId(userId);
     } catch (error) {
-      return res.status(403).json({ error: 'Farmer profile required. Please create a farmer profile first.' });
+      return res.status(403).json({
+        error: 'Farmer profile required. Please create a farmer profile first.',
+      });
     }
 
     const farmerId = farmer.id;
 
-    const { name, description, price, quantity, category } = req.body;
+    const {
+      name,
+      description,
+      price,
+      quantity,
+      category,
+      unit,
+      harvest_date,
+      quality_grade,
+      minimum_order_quantity,
+      images,
+    } = req.body;
 
     if (!name || price === undefined) {
       return res.status(400).json({ error: 'Name and price are required' });
+    }
+
+    if (typeof price !== 'number' || price < 0) {
+      return res.status(400).json({ error: 'Price must be a non-negative number' });
+    }
+
+    if (quantity !== undefined && (typeof quantity !== 'number' || quantity < 0)) {
+      return res.status(400).json({ error: 'Quantity must be a non-negative number' });
+    }
+
+    if (
+      minimum_order_quantity !== undefined &&
+      (typeof minimum_order_quantity !== 'number' || minimum_order_quantity < 1)
+    ) {
+      return res.status(400).json({ error: 'minimum_order_quantity must be at least 1' });
+    }
+
+    if (images !== undefined && !Array.isArray(images)) {
+      return res.status(400).json({ error: 'images must be an array of URLs' });
     }
 
     const product = await productService.createProduct(
@@ -54,7 +85,14 @@ export const createProduct = async (req: Request, res: Response) => {
       price,
       quantity || 0,
       farmerId,
-      category || 'General'
+      category || 'General',
+      {
+        unit,
+        harvest_date,
+        quality_grade,
+        minimum_order_quantity,
+        images,
+      }
     );
     res.status(201).json({ data: product });
   } catch (error: any) {
@@ -68,7 +106,9 @@ export const updateProduct = async (req: Request, res: Response) => {
     const product = await productService.updateProduct(id, req.body);
     res.json({ data: product });
   } catch (error: any) {
-    res.status(error.message.includes('not found') ? 404 : 400).json({ error: error.message });
+    res
+      .status(error.message.includes('not found') ? 404 : 400)
+      .json({ error: error.message });
   }
 };
 
@@ -78,7 +118,9 @@ export const deleteProduct = async (req: Request, res: Response) => {
     await productService.deleteProduct(id);
     res.json({ message: 'Product deleted successfully' });
   } catch (error: any) {
-    res.status(error.message.includes('not found') ? 404 : 400).json({ error: error.message });
+    res
+      .status(error.message.includes('not found') ? 404 : 400)
+      .json({ error: error.message });
   }
 };
 
