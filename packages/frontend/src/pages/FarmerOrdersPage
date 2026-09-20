@@ -1,0 +1,97 @@
+import { useEffect, useState } from 'react';
+import Layout from '../components/Layout';
+import apiClient from '../services/api';
+
+export default function FarmerOrdersPage() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+
+  const load = () => {
+    apiClient
+      .getFarmerOrders(status || undefined)
+      .then((res) => setOrders(res.data || []))
+      .catch((e) => setError(e.response?.data?.error || 'Failed to load orders'));
+  };
+
+  useEffect(() => {
+    load();
+  }, [status]);
+
+  const accept = async (id: string) => {
+    try {
+      await apiClient.acceptOrder(id);
+      load();
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Accept failed');
+    }
+  };
+
+  const reject = async (id: string) => {
+    try {
+      await apiClient.rejectOrder(id);
+      load();
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Reject failed');
+    }
+  };
+
+  const advance = async (id: string, next: string) => {
+    try {
+      await apiClient.updateOrderStatus(id, next);
+      load();
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Update failed');
+    }
+  };
+
+  return (
+    <Layout>
+      <h1>Farm Orders</h1>
+      <select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <option value="">All</option>
+        <option value="pending">Pending</option>
+        <option value="accepted">Accepted</option>
+        <option value="processing">Processing</option>
+        <option value="ready_for_pickup">Ready for pickup</option>
+        <option value="in_transit">In transit</option>
+        <option value="delivered">Delivered</option>
+        <option value="completed">Completed</option>
+        <option value="rejected">Rejected</option>
+      </select>
+      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {orders.map((o) => (
+          <li key={o.id} style={{ borderBottom: '1px solid #eee', padding: '12px 0' }}>
+            <div>
+              <strong>#{o.id.slice(0, 8)}</strong> — {o.status} — {o.total_price}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {o.status === 'pending' && (
+                <>
+                  <button type="button" onClick={() => accept(o.id)}>Accept</button>
+                  <button type="button" onClick={() => reject(o.id)}>Reject</button>
+                </>
+              )}
+              {o.status === 'accepted' && (
+                <button type="button" onClick={() => advance(o.id, 'processing')}>Start processing</button>
+              )}
+              {o.status === 'processing' && (
+                <button type="button" onClick={() => advance(o.id, 'ready_for_pickup')}>Ready for pickup</button>
+              )}
+              {o.status === 'ready_for_pickup' && (
+                <button type="button" onClick={() => advance(o.id, 'in_transit')}>Mark in transit</button>
+              )}
+              {o.status === 'in_transit' && (
+                <button type="button" onClick={() => advance(o.id, 'delivered')}>Mark delivered</button>
+              )}
+              {o.status === 'delivered' && (
+                <button type="button" onClick={() => advance(o.id, 'completed')}>Complete</button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Layout>
+  );
+}
