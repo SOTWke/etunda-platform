@@ -1,0 +1,9 @@
+import { Router } from 'express';
+import * as checkoutController from '../controllers/checkoutController';
+import { authMiddleware } from '../middleware/auth';
+
+const router = Router();
+
+router.post('/', authMiddleware, checkoutController.checkout);
+
+export default router;
