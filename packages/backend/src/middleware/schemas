@@ -1,0 +1,83 @@
+import Joi from 'joi';
+
+export const createProductSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).required(),
+  description: Joi.string().allow('').max(5000).optional(),
+  price: Joi.number().min(0).required(),
+  quantity: Joi.number().integer().min(0).optional(),
+  category: Joi.string().trim().max(100).optional(),
+  unit: Joi.string().trim().max(50).optional(),
+  harvest_date: Joi.date().iso().allow(null).optional(),
+  quality_grade: Joi.string().trim().max(50).allow(null, '').optional(),
+  minimum_order_quantity: Joi.number().integer().min(1).optional(),
+  images: Joi.array().items(Joi.string().uri()).optional(),
+});
+
+export const updateProductSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).optional(),
+  description: Joi.string().allow('').max(5000).optional(),
+  price: Joi.number().min(0).optional(),
+  quantity: Joi.number().integer().min(0).optional(),
+  category: Joi.string().trim().max(100).optional(),
+  unit: Joi.string().trim().max(50).optional(),
+  harvest_date: Joi.date().iso().allow(null).optional(),
+  quality_grade: Joi.string().trim().max(50).allow(null, '').optional(),
+  minimum_order_quantity: Joi.number().integer().min(1).optional(),
+  images: Joi.array().items(Joi.string().uri()).optional(),
+}).min(1);
+
+export const createOrderSchema = Joi.object({
+  productId: Joi.string().uuid().required(),
+  quantity: Joi.number().integer().min(1).required(),
+});
+
+export const updateOrderStatusSchema = Joi.object({
+  status: Joi.string()
+    .valid(
+      'pending',
+      'accepted',
+      'rejected',
+      'confirmed',
+      'processing',
+      'ready_for_pickup',
+      'in_transit',
+      'delivered',
+      'completed',
+      'cancelled',
+      'disputed'
+    )
+    .required(),
+});
+
+export const addToCartSchema = Joi.object({
+  productId: Joi.string().uuid().required(),
+  quantity: Joi.number().integer().min(1).required(),
+});
+
+export const updateCartItemSchema = Joi.object({
+  quantity: Joi.number().integer().min(1).required(),
+});
+
+export const createFarmerSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).required(),
+  location: Joi.string().trim().max(255).allow('').optional(),
+  phone: Joi.string().trim().max(20).allow('').optional(),
+  bio: Joi.string().allow('').max(2000).optional(),
+});
+
+export const createBuyerSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).required(),
+  location: Joi.string().trim().max(255).allow('').optional(),
+  phone: Joi.string().trim().max(20).allow('').optional(),
+});
+
+export const registerSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).max(128).required(),
+  role: Joi.string().valid('farmer', 'buyer').required(),
+});
+
+export const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+});
