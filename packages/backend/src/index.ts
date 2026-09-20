@@ -11,6 +11,7 @@ import buyerRoutes from './routes/buyerRoutes';
 import orderRoutes from './routes/orderRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import cartRoutes from './routes/cartRoutes';
+import checkoutRoutes from './routes/checkoutRoutes';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use('/api/buyers', buyerRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api/checkout', checkoutRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -60,7 +62,6 @@ const startServer = async () => {
     await initializeDatabase();
     console.log('✅ Database initialized');
 
-    // Initialize payments table if Stripe is configured
     if (process.env.STRIPE_SECRET_KEY) {
       try {
         const { initializePaymentsTable } = await import('./services/paymentService');
@@ -74,8 +75,8 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 eTunda Backend running on port ${PORT}`);
       console.log(`📍 Health: http://localhost:${PORT}/health`);
-      console.log(`💳 Payments: http://localhost:${PORT}/api/payments`);
       console.log(`🛒 Cart: http://localhost:${PORT}/api/cart`);
+      console.log(`✅ Checkout: http://localhost:${PORT}/api/checkout`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
