@@ -1,0 +1,79 @@
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import Layout from '../components/Layout';
+import apiClient from '../services/api';
+import { useAuthStore } from '../stores/authStore';
+
+export default function ProductDetailPage() {
+  const { id } = useParams();
+  const [product, setProduct] = useState<any>(null);
+  const [qty, setQty] = useState(1);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const { user, token } = useAuthStore();
+
+  useEffect(() => {
+    if (!id) return;
+    apiClient
+      .getProduct(id)
+      .then((res) => setProduct(res.data))
+      .catch((e) => setError(e.response?.data?.error || 'Not found'));
+  }, [id]);
+
+  const addToCart = async () => {
+    setMessage('');
+    setError('');
+    try {
+      await apiClient.addToCart(id!, qty);
+      setMessage('Added to cart');
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Failed to add');
+    }
+  };
+
+  if (error && !product) {
+    return (
+      <Layout>
+        <p style={{ color: 'crimson' }}>{error}</p>
+        <Link to="/products">Back</Link>
+      </Layout>
+    );
+  }
+
+  if (!product) {
+    return (
+      <Layout>
+        <p>Loading…</p>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <Link to="/products">← Products</Link>
+      <h1>{product.name}</h1>
+      <p>{product.description}</p>
+      <p>
+        <strong>{product.price}</strong> / {product.unit || 'unit'} · Stock: {product.quantity}
+        {product.minimum_order_quantity ? ` · MOQ: ${product.minimum_order_quantity}` : ''}
+      </p>
+      {product.quality_grade && <p>Grade: {product.quality_grade}</p>}
+      {token && user?.role === 'buyer' && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16 }}>
+          <input
+            type="number"
+            min={product.minimum_order_quantity || 1}
+            value={qty}
+            onChange={(e) => setQty(Number(e.target.value))}
+            style={{ width: 80 }}
+          />
+          <button type="button" onClick={addToCart}>
+            Add to cart
+          </button>
+        </div>
+      )}
+      {message && <p style={{ color: 'green' }}>{message}</p>}
+      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+    </Layout>
+  );
+}
