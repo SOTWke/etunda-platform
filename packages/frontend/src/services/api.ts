@@ -19,14 +19,19 @@ interface Product {
   quantity: number;
   farmer_id: string;
   category: string;
+  unit?: string;
+  harvest_date?: string | null;
+  quality_grade?: string | null;
+  minimum_order_quantity?: number;
+  images?: string;
   created_at: string;
 }
 
 interface Order {
   id: string;
   buyer_id: string;
-  product_id: string;
-  quantity: number;
+  product_id: string | null;
+  quantity: number | null;
   total_price: number;
   status: string;
 }
@@ -37,7 +42,7 @@ class ApiClient {
 
   constructor() {
     this.token = localStorage.getItem('authToken');
-    
+
     this.client = axios.create({
       baseURL: API_BASE_URL,
       headers: {
@@ -45,7 +50,6 @@ class ApiClient {
       },
     });
 
-    // Add token to all requests
     this.client.interceptors.request.use((config) => {
       if (this.token) {
         config.headers.Authorization = `Bearer ${this.token}`;
@@ -53,7 +57,6 @@ class ApiClient {
       return config;
     });
 
-    // Handle errors globally
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -66,7 +69,7 @@ class ApiClient {
     );
   }
 
-  // Auth endpoints
+  // Auth
   async register(email: string, password: string, role: string = 'buyer'): Promise<AuthResponse> {
     const response = await this.client.post<AuthResponse>('/auth/register', {
       email,
@@ -91,7 +94,7 @@ class ApiClient {
     return response.data;
   }
 
-  // Products endpoints
+  // Products
   async getProducts(limit: number = 20, offset: number = 0) {
     const response = await this.client.get('/products', {
       params: { limit, offset },
@@ -126,7 +129,7 @@ class ApiClient {
     return response.data;
   }
 
-  // Farmers endpoints
+  // Farmers
   async getFarmers(limit: number = 20, offset: number = 0) {
     const response = await this.client.get('/farmers', {
       params: { limit, offset },
@@ -154,7 +157,6 @@ class ApiClient {
     return response.data;
   }
 
-  // ✅ NEW: Farm profile (extended farmer details)
   async getFarmProfile() {
     const response = await this.client.get('/farmers/farm/profile/details');
     return response.data;
@@ -186,7 +188,7 @@ class ApiClient {
     return response.data;
   }
 
-  // Buyers endpoints
+  // Buyers
   async getBuyers(limit: number = 20, offset: number = 0) {
     const response = await this.client.get('/buyers', {
       params: { limit, offset },
@@ -214,7 +216,7 @@ class ApiClient {
     return response.data;
   }
 
-  // Orders endpoints
+  // Orders
   async getOrders(limit: number = 20, offset: number = 0) {
     const response = await this.client.get('/orders', {
       params: { limit, offset },
@@ -244,6 +246,55 @@ class ApiClient {
     const response = await this.client.patch(`/orders/${id}/status`, {
       status,
     });
+    return response.data;
+  }
+
+  async getFarmerOrders(status?: string) {
+    const response = await this.client.get('/orders/farmer', {
+      params: status ? { status } : {},
+    });
+    return response.data;
+  }
+
+  async acceptOrder(id: string) {
+    const response = await this.client.post(`/orders/${id}/accept`);
+    return response.data;
+  }
+
+  async rejectOrder(id: string) {
+    const response = await this.client.post(`/orders/${id}/reject`);
+    return response.data;
+  }
+
+  // Cart
+  async getCart() {
+    const response = await this.client.get('/cart');
+    return response.data;
+  }
+
+  async addToCart(productId: string, quantity: number) {
+    const response = await this.client.post('/cart', { productId, quantity });
+    return response.data;
+  }
+
+  async updateCartItem(productId: string, quantity: number) {
+    const response = await this.client.put(`/cart/${productId}`, { quantity });
+    return response.data;
+  }
+
+  async removeFromCart(productId: string) {
+    const response = await this.client.delete(`/cart/${productId}`);
+    return response.data;
+  }
+
+  async clearCart() {
+    const response = await this.client.delete('/cart');
+    return response.data;
+  }
+
+  // Checkout
+  async checkout() {
+    const response = await this.client.post('/checkout');
     return response.data;
   }
 
