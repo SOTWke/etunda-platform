@@ -25,13 +25,29 @@ export const createProduct = async (
   price: number,
   quantity: number,
   farmerId: string,
-  category: string
+  category: string,
+  options?: {
+    unit?: string;
+    harvest_date?: string | null;
+    quality_grade?: string | null;
+    minimum_order_quantity?: number;
+    images?: string[];
+  }
 ): Promise<Product> => {
+  const unit = options?.unit || 'kg';
+  const harvestDate = options?.harvest_date || null;
+  const qualityGrade = options?.quality_grade || null;
+  const moq = options?.minimum_order_quantity ?? 1;
+  const images = JSON.stringify(options?.images || []);
+
   const result = await query(
-    `INSERT INTO products (name, description, price, quantity, farmer_id, category)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO products (
+       name, description, price, quantity, farmer_id, category,
+       unit, harvest_date, quality_grade, minimum_order_quantity, images
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
      RETURNING *`,
-    [name, description, price, quantity, farmerId, category]
+    [name, description, price, quantity, farmerId, category, unit, harvestDate, qualityGrade, moq, images]
   );
 
   return result.rows[0];
@@ -39,39 +55,73 @@ export const createProduct = async (
 
 export const updateProduct = async (
   id: string,
-  { name, description, price, quantity, category }: Partial<Product>
+  updates: Partial<{
+    name: string;
+    description: string;
+    price: number;
+    quantity: number;
+    category: string;
+    unit: string;
+    harvest_date: string | null;
+    quality_grade: string | null;
+    minimum_order_quantity: number;
+    images: string[];
+  }>
 ): Promise<Product> => {
-  const fields = [];
-  const values = [];
+  const fields: string[] = [];
+  const values: any[] = [];
   let paramCount = 1;
 
-  if (name !== undefined) {
-    fields.push(`name = $${paramCount++}`);
-    values.push(name);
+  if (updates.name !== undefined) {
+    fields.push(`name = \[ {paramCount++}`);
+    values.push(updates.name);
   }
-  if (description !== undefined) {
-    fields.push(`description = $${paramCount++}`);
-    values.push(description);
+  if (updates.description !== undefined) {
+    fields.push(`description = \]{paramCount++}`);
+    values.push(updates.description);
   }
-  if (price !== undefined) {
-    fields.push(`price = $${paramCount++}`);
-    values.push(price);
+  if (updates.price !== undefined) {
+    fields.push(`price = \[ {paramCount++}`);
+    values.push(updates.price);
   }
-  if (quantity !== undefined) {
-    fields.push(`quantity = $${paramCount++}`);
-    values.push(quantity);
+  if (updates.quantity !== undefined) {
+    fields.push(`quantity = \]{paramCount++}`);
+    values.push(updates.quantity);
   }
-  if (category !== undefined) {
-    fields.push(`category = $${paramCount++}`);
-    values.push(category);
+  if (updates.category !== undefined) {
+    fields.push(`category = \[ {paramCount++}`);
+    values.push(updates.category);
+  }
+  if (updates.unit !== undefined) {
+    fields.push(`unit = \]{paramCount++}`);
+    values.push(updates.unit);
+  }
+  if (updates.harvest_date !== undefined) {
+    fields.push(`harvest_date = \[ {paramCount++}`);
+    values.push(updates.harvest_date);
+  }
+  if (updates.quality_grade !== undefined) {
+    fields.push(`quality_grade = \]{paramCount++}`);
+    values.push(updates.quality_grade);
+  }
+  if (updates.minimum_order_quantity !== undefined) {
+    fields.push(`minimum_order_quantity = \[ {paramCount++}`);
+    values.push(updates.minimum_order_quantity);
+  }
+  if (updates.images !== undefined) {
+    fields.push(`images = \]{paramCount++}::jsonb`);
+    values.push(JSON.stringify(updates.images));
+  }
+
+  if (fields.length === 0) {
+    return getProductById(id);
   }
 
   fields.push(`updated_at = CURRENT_TIMESTAMP`);
   values.push(id);
 
-  const query_text = `UPDATE products SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
-
-  const result = await query(query_text, values);
+  const queryText = `UPDATE products SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+  const result = await query(queryText, values);
 
   if (result.rows.length === 0) {
     throw new Error('Product not found');
@@ -89,13 +139,18 @@ export const deleteProduct = async (id: string): Promise<void> => {
 };
 
 export const getProductsByFarmer = async (farmerId: string): Promise<Product[]> => {
-  const result = await query(`SELECT * FROM products WHERE farmer_id = $1 ORDER BY created_at DESC`, [farmerId]);
+  const result = await query(
+    `SELECT * FROM products WHERE farmer_id = $1 ORDER BY created_at DESC`,
+    [farmerId]
+  );
   return result.rows;
 };
 
 export const searchProducts = async (searchTerm: string): Promise<Product[]> => {
   const result = await query(
-    `SELECT * FROM products WHERE name ILIKE $1 OR description ILIKE $1 ORDER BY created_at DESC`,
+    `SELECT * FROM products
+     WHERE name ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
+     ORDER BY created_at DESC`,
     [`%${searchTerm}%`]
   );
   return result.rows;
