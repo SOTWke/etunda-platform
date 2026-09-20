@@ -1,0 +1,125 @@
+import { getClient } from '../config/database';
+import * as cartService from './cartService';
+
+export interface CheckoutResult {
+  order: any;
+  items: any[];
+  total: number;
+}
+
+export const checkout = async (buyerId: string): Promise<CheckoutResult> => {
+  const cartItems = await cartService.getCartByBuyer(buyerId);
+
+  if (!cartItems || cartItems.length === 0) {
+    throw new Error('Cart is empty');
+  }
+
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    let total = 0;
+    const lineItems: {
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+    }[] = [];
+
+    // Lock each product, re-validate stock + MOQ, compute prices server-side
+    for (const item of cartItems) {
+      const productResult = await client.query(
+        'SELECT id, price, quantity, minimum_order_quantity FROM products WHERE id = $1 FOR UPDATE',
+        [item.product_id]
+      );
+
+      if (productResult.rows.length === 0) {
+        throw new Error('Product not found: ' + item.product_id);
+      }
+
+      const product = productResult.rows[0];
+      const qty = Number(item.quantity);
+      const moq = product.minimum_order_quantity || 1;
+
+      if (qty < moq) {
+        throw new Error(
+          'Quantity for product ' + product.id + ' must be at least MOQ (' + moq + ')'
+        );
+      }
+
+      if (product.quantity < qty) {
+        throw new Error(
+          'Insufficient stock for product ' +
+            product.id +
+            '. Available: ' +
+            product.quantity +
+            ', Requested: ' +
+            qty
+        );
+      }
+
+      const unitPrice = Number(product.price);
+      const lineTotal = Number((unitPrice * qty).toFixed(2));
+      total += lineTotal;
+
+      lineItems.push({
+        productId: product.id,
+        quantity: qty,
+        unitPrice,
+        lineTotal,
+      });
+    }
+
+    total = Number(total.toFixed(2));
+
+    // Create order header (product_id/quantity left null — multi-item via order_items)
+    const orderResult = await client.query(
+      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, status)
+       VALUES ($1, NULL, NULL, $2, 'pending')
+       RETURNING *`,
+      [buyerId, total]
+    );
+
+    if (orderResult.rows.length === 0) {
+      throw new Error('Failed to create order');
+    }
+
+    const order = orderResult.rows[0];
+    const createdItems: any[] = [];
+
+    // Insert order_items and decrement stock
+    for (const line of lineItems) {
+      const itemResult = await client.query(
+        `INSERT INTO order_items (order_id, product_id, quantity, unit_price, line_total)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [order.id, line.productId, line.quantity, line.unitPrice, line.lineTotal]
+      );
+      createdItems.push(itemResult.rows[0]);
+
+      await client.query(
+        `UPDATE products
+         SET quantity = quantity - $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [line.quantity, line.productId]
+      );
+    }
+
+    // Clear cart
+    await client.query('DELETE FROM cart_items WHERE buyer_id = $1', [buyerId]);
+
+    await client.query('COMMIT');
+
+    return {
+      order,
+      items: createdItems,
+      total,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
