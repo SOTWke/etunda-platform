@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as farmerController from '../controllers/farmerController';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth';
+import { authMiddleware, optionalAuthMiddleware, roleMiddleware } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createFarmerSchema } from '../middleware/schemas';
 
@@ -14,12 +14,12 @@ router.get('/search/category', optionalAuthMiddleware, farmerController.searchBy
 router.get('/:id', optionalAuthMiddleware, farmerController.getFarmerById);
 
 // Protected endpoints
-router.post('/', authMiddleware, validate(createFarmerSchema), farmerController.createFarmer);
-router.put('/:id', authMiddleware, farmerController.updateFarmer);
+router.post('/', authMiddleware, roleMiddleware(['farmer']), validate(createFarmerSchema), farmerController.createFarmer);
+router.put('/:id', authMiddleware, roleMiddleware(['farmer']), farmerController.updateFarmer);
 
 // Farm profile endpoints
-router.get('/profile/me', authMiddleware, farmerController.getMyProfile);
-router.post('/farm/profile', authMiddleware, farmerController.updateFarmProfile);
-router.get('/farm/profile/details', authMiddleware, farmerController.getFarmProfile);
+router.get('/profile/me', authMiddleware, roleMiddleware(['farmer']), farmerController.getMyProfile);
+router.post('/farm/profile', authMiddleware, roleMiddleware(['farmer']), farmerController.updateFarmProfile);
+router.get('/farm/profile/details', authMiddleware, roleMiddleware(['farmer']), farmerController.getFarmProfile);
 
 export default router;
