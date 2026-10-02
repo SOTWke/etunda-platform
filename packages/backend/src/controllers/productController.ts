@@ -27,9 +27,14 @@ export const getProductById = async (req: Request, res: Response) => {
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
+    const role = (req as any).user?.role;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (role !== 'farmer') {
+      return res.status(403).json({ error: 'Only farmers can create products' });
     }
 
     let farmer;
@@ -102,9 +107,33 @@ export const createProduct = async (req: Request, res: Response) => {
 
 export const updateProduct = async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user?.id;
+    const role = (req as any).user?.role;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (role !== 'farmer') {
+      return res.status(403).json({ error: 'Only farmers can update products' });
+    }
+
     const { id } = req.params;
-    const product = await productService.updateProduct(id, req.body);
-    res.json({ data: product });
+    const product = await productService.getProductById(id);
+
+    let farmer;
+    try {
+      farmer = await farmerService.getFarmerByUserId(userId);
+    } catch (error) {
+      return res.status(403).json({ error: 'Farmer profile required' });
+    }
+
+    if (product.farmer_id !== farmer.id) {
+      return res.status(403).json({ error: 'You can only update your own products' });
+    }
+
+    const updated = await productService.updateProduct(id, req.body);
+    res.json({ data: updated });
   } catch (error: any) {
     res
       .status(error.message.includes('not found') ? 404 : 400)
@@ -114,7 +143,31 @@ export const updateProduct = async (req: Request, res: Response) => {
 
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user?.id;
+    const role = (req as any).user?.role;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (role !== 'farmer') {
+      return res.status(403).json({ error: 'Only farmers can delete products' });
+    }
+
     const { id } = req.params;
+    const product = await productService.getProductById(id);
+
+    let farmer;
+    try {
+      farmer = await farmerService.getFarmerByUserId(userId);
+    } catch (error) {
+      return res.status(403).json({ error: 'Farmer profile required' });
+    }
+
+    if (product.farmer_id !== farmer.id) {
+      return res.status(403).json({ error: 'You can only delete your own products' });
+    }
+
     await productService.deleteProduct(id);
     res.json({ message: 'Product deleted successfully' });
   } catch (error: any) {
@@ -127,12 +180,13 @@ export const deleteProduct = async (req: Request, res: Response) => {
 export const searchProducts = async (req: Request, res: Response) => {
   try {
     const { q } = req.query;
+    const searchTerm = typeof q === 'string' ? q.trim() : '';
 
-    if (!q) {
+    if (!searchTerm) {
       return res.status(400).json({ error: 'Search query required' });
     }
 
-    const products = await productService.searchProducts(q as string);
+    const products = await productService.searchProducts(searchTerm);
     res.json({ data: products });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

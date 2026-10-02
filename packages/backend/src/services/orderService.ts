@@ -17,7 +17,6 @@ const VALID_STATUSES = [
 
 type OrderStatus = (typeof VALID_STATUSES)[number];
 
-// Allowed transitions (from → to[])
 const TRANSITIONS: Record<string, string[]> = {
   pending: ['accepted', 'rejected', 'cancelled'],
   accepted: ['processing', 'cancelled', 'disputed'],
@@ -138,7 +137,6 @@ export const getAllOrders = async (
   return result.rows;
 };
 
-/** Orders that include products belonging to this farmer */
 export const getOrdersByFarmer = async (
   farmerId: string,
   status?: string
@@ -188,25 +186,40 @@ export const updateOrderStatus = async (
     );
   }
 
-  // Role rules: farmers accept/reject/process; buyers cancel from pending only
   if (actor) {
     if (actor.role === 'buyer') {
       if (!(from === 'pending' && newStatus === 'cancelled')) {
         throw new Error('Buyers can only cancel pending orders');
       }
     }
+
     if (actor.role === 'farmer') {
-      const farmerAllowed = [
-        'accepted',
-        'rejected',
-        'processing',
-        'ready_for_pickup',
-        'in_transit',
-        'delivered',
-        'completed',
-      ];
-      if (!farmerAllowed.includes(newStatus) && newStatus !== 'cancelled') {
-        // farmers can also cancel in early stages via transition table
+      if (!actor.userId) {
+        throw new Error('Farmer context is required');
+      }
+
+      const farmerResult = await query('SELECT id FROM farmers WHERE user_id = $1', [actor.userId]);
+      if (farmerResult.rows.length === 0) {
+        throw new Error('Farmer profile required');
+      }
+
+      const farmerId = farmerResult.rows[0].id;
+
+      if (!current.product_id) {
+        throw new Error('Order is not associated with a product');
+      }
+
+      const productResult = await query(
+        'SELECT farmer_id FROM products WHERE id = $1',
+        [current.product_id]
+      );
+
+      if (productResult.rows.length === 0) {
+        throw new Error('Product no longer exists');
+      }
+
+      if (productResult.rows[0].farmer_id !== farmerId) {
+        throw new Error('You can only update orders for your own products');
       }
     }
   }
