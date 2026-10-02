@@ -2,6 +2,11 @@ import { Request, Response } from 'express';
 import * as farmerService from '../services/farmerService';
 import * as farmerDetailsService from '../services/farmerDetailsService';
 
+/**
+ * Create farmer profile
+ * - One farmer profile per user
+ * - Only users with 'farmer' role can create
+ */
 export const createFarmer = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -15,6 +20,7 @@ export const createFarmer = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Only farmers can create farmer profiles' });
     }
 
+    // Check if farmer profile already exists
     try {
       await farmerService.getFarmerByUserId(userId);
       return res.status(409).json({ error: 'Farmer profile already exists' });
@@ -24,23 +30,31 @@ export const createFarmer = async (req: Request, res: Response) => {
 
     const { name, location, phone, bio } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ error: 'Name is required' });
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Name is required and must be a non-empty string' });
     }
 
-    const farmer = await farmerService.createFarmer(userId, name, location || '', phone || '', bio || '');
+    const farmer = await farmerService.createFarmer(
+      userId,
+      name.trim(),
+      location || '',
+      phone || '',
+      bio || ''
+    );
     res.status(201).json({ data: farmer });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
 
+/**
+ * Get farmer by ID (public)
+ */
 export const getFarmerById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const farmer = await farmerService.getFarmerById(id);
-    
-    // ✅ Get farmer details
+
     let farmerDetails = null;
     try {
       farmerDetails = await farmerDetailsService.getFarmerDetailsByFarmerId(id);
@@ -54,10 +68,17 @@ export const getFarmerById = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Get all farmers with pagination
+ */
 export const getAllFarmers = async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+    }
 
     const farmers = await farmerService.getAllFarmers(limit, offset);
     res.json({ data: farmers, limit, offset });
@@ -66,13 +87,21 @@ export const getAllFarmers = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Update farmer profile
+ * - Only farmer can update their own profile
+ */
 export const updateFarmer = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const { id } = req.params;
 
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const farmer = await farmerService.getFarmerById(id);
-    
+
     if (farmer.user_id !== userId) {
       return res.status(403).json({ error: 'Cannot update another farmer\'s profile' });
     }
@@ -80,10 +109,14 @@ export const updateFarmer = async (req: Request, res: Response) => {
     const updated = await farmerService.updateFarmer(id, req.body);
     res.json({ data: updated });
   } catch (error: any) {
-    res.status(error.message.includes('not found') ? 404 : 400).json({ error: error.message });
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ error: error.message });
   }
 };
 
+/**
+ * Get authenticated farmer's own profile
+ */
 export const getMyProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -93,8 +126,7 @@ export const getMyProfile = async (req: Request, res: Response) => {
     }
 
     const farmer = await farmerService.getFarmerByUserId(userId);
-    
-    // ✅ Get extended farm details
+
     let farmerDetails = null;
     try {
       farmerDetails = await farmerDetailsService.getFarmerDetailsByFarmerId(farmer.id);
@@ -104,11 +136,13 @@ export const getMyProfile = async (req: Request, res: Response) => {
 
     res.json({ data: { ...farmer, details: farmerDetails } });
   } catch (error: any) {
-    res.status(404).json({ error: error.message });
+    res.status(404).json({ error: 'Farmer profile not found' });
   }
 };
 
-// ✅ NEW: Update extended farm profile (farm details)
+/**
+ * Update extended farm profile
+ */
 export const updateFarmProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -117,22 +151,21 @@ export const updateFarmProfile = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get farmer profile
     const farmer = await farmerService.getFarmerByUserId(userId);
 
-    // ✅ Validate input
-    const { 
-      farm_name, 
-      farm_location, 
-      county, 
-      latitude, 
-      longitude, 
+    const {
+      farm_name,
+      farm_location,
+      county,
+      latitude,
+      longitude,
       profile_image_url,
       farming_categories,
       crops_produce,
-      farm_description 
+      farm_description,
     } = req.body;
 
+    // Validate GPS coordinates
     if (latitude !== undefined && longitude !== undefined) {
       if (typeof latitude !== 'number' || typeof longitude !== 'number') {
         return res.status(400).json({ error: 'Latitude and longitude must be numbers' });
@@ -150,7 +183,6 @@ export const updateFarmProfile = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'crops_produce must be an array' });
     }
 
-    // ✅ Update farm details
     const updated = await farmerDetailsService.updateFarmerDetails(farmer.id, {
       farm_name,
       farm_location,
@@ -160,16 +192,19 @@ export const updateFarmProfile = async (req: Request, res: Response) => {
       profile_image_url,
       farming_categories: farming_categories ? JSON.stringify(farming_categories) : undefined,
       crops_produce: crops_produce ? JSON.stringify(crops_produce) : undefined,
-      farm_description
+      farm_description,
     } as any);
 
     res.json({ data: updated });
   } catch (error: any) {
-    res.status(error.message.includes('not found') ? 404 : 400).json({ error: error.message });
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ error: error.message });
   }
 };
 
-// ✅ NEW: Get farm profile details
+/**
+ * Get farm profile details
+ */
 export const getFarmProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -187,11 +222,17 @@ export const getFarmProfile = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ NEW: Get verified farmers
+/**
+ * Get verified farmers
+ */
 export const getVerifiedFarmers = async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+    }
 
     const farmers = await farmerDetailsService.getVerifiedFarmers(limit, offset);
     res.json({ data: farmers, limit, offset });
@@ -200,38 +241,52 @@ export const getVerifiedFarmers = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ NEW: Search farmers by county
+/**
+ * Search farmers by county
+ */
 export const searchByCounty = async (req: Request, res: Response) => {
   try {
     const { county } = req.query;
+    const countyStr = typeof county === 'string' ? county.trim() : '';
 
-    if (!county) {
+    if (!countyStr) {
       return res.status(400).json({ error: 'County parameter required' });
     }
 
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const farmers = await farmerDetailsService.searchFarmersByCounty(county as string, limit, offset);
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+    }
+
+    const farmers = await farmerDetailsService.searchFarmersByCounty(countyStr, limit, offset);
     res.json({ data: farmers, limit, offset });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// ✅ NEW: Search farmers by farming category
+/**
+ * Search farmers by farming category
+ */
 export const searchByCategory = async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
+    const categoryStr = typeof category === 'string' ? category.trim() : '';
 
-    if (!category) {
+    if (!categoryStr) {
       return res.status(400).json({ error: 'Category parameter required' });
     }
 
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const farmers = await farmerDetailsService.searchFarmersByCategory(category as string, limit, offset);
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+    }
+
+    const farmers = await farmerDetailsService.searchFarmersByCategory(categoryStr, limit, offset);
     res.json({ data: farmers, limit, offset });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
